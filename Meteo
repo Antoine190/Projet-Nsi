@@ -1,24 +1,97 @@
+import requests
+import json
+from datetime import datetime
+import pytz
+from pytz import timezone
+from PIL import Image, ImageTk
+from IPython.display import display
+from io import BytesIO
+import tkinter
 
-from tkinter import *
-from tkinter import ttk
+api_key = "a51763db8b72ce22dd839eb16010cdd9"
 
-win= Tk()
+lat_ville=0
+lon_ville=0
+ville_a_mettre=[]
+meteo= tkinter.Tk() #Fenetre pour entrer la ville et acceder a sa latitude et longitude 
 def display_text():
-   global entry
-   string= entry.get()
-   print(string)
-   return string
+    global entry,lat_ville,lon_ville
+    ville= entry.get()
+    meteo.destroy() # Fermeture de la fenetre 
+    url_ville = "https://api.openweathermap.org/data/2.5/weather?q=%s&appid=%s&units=metric" % (ville, api_key)#Ouverture du lien pour acceder au coordonee de la ville 
+    response = requests.get(url_ville)
+    data_lat_long = json.loads(response.text)
+    lat_ville, lon_ville = data_lat_long['coord']['lat'],data_lat_long['coord']['lon'] #creation d'une variable pour avoir les latidutes et longitudes
+    ville_a_mettre.append(data_lat_long['name'])#Obtention du nom de la ville pour l'afficher 
+    return lat_ville,lon_ville, ville_a_mettre
 
-
-
-label=Label(win,text= 'ville')
+label= tkinter.Label(meteo, text= 'ville') #Ouverture Premiere pour obtenir la ville sur lequel on veut les differetens informations
 label.pack()
-
-entry= Entry(win)
+entry= tkinter.Entry(meteo)
 entry.focus_set()
 entry.pack()
+tkinter.Button(meteo, text= "Okay",width= 20, command= display_text).pack(pady=20) # Bouton pour valider la ville 
+meteo.mainloop() #Feneture de la premiere fenetre
 
-ttk.Button(win, text= "Okay",width= 20, command= display_text).pack(pady=20)
+# Obtention des informations meteo via les latidutes et longitudes via la premiere fenetre
+url = "https://api.openweathermap.org/data/2.5/onecall?lat=%s&lon=%s&appid=%s&units=metric" % (lat_ville, lon_ville, api_key)
+response = requests.get(url) 
+data_meteo = json.loads(response.text) # Dictionnaires avec tous les informations
 
-win.mainloop()
+#Fonction pour obtenir le lien de l'image via le json
+get_id_photo= data_meteo['current']['weather'][0]['icon']
+def get_image(url):
+    response = requests.get(url, stream=True)
+    if response.headers['Content-Type'].startswith('image/'):
+        image = Image.open(response.raw)
+        photo = ImageTk.PhotoImage(image)
+        return photo
+    return None
+
+#Fenetre qui affiche la meteo pour les 3 prochains jours avec la ville 
+root= tkinter.Tk()
+
+l = tkinter.Label(root, text=ville_a_mettre, padx=20, pady=20)
+l.pack()
+actuel= tkinter.Label(root, text= 'Temps actuellement : ')
+actuel.pack()
+#Affichage de l'image via la fonction
+image = get_image("http://openweathermap.org/img/w/%s.png" % get_id_photo)
+image_label = tkinter.Label(root, image=image)
+image_label.pack()
+actuel= tkinter.Label(root, text= 'Temperature actuel : ')
+actuel.pack()
+#Affichage temperature actuel 
+temp = data_meteo['current']['temp']
+temp_affiche= tkinter.Label(root, text = temp )
+temp_affiche.pack()
+
+p= tkinter.PanedWindow(root)
+p.add(tkinter.Label(p, text="Aujourd'hui", background='white'))
+p.add(tkinter.Label(p, text='Demain', background='white') )
+p.add(tkinter.Label(p, text='Apres-Demain', background='white') )
+p.pack()
+
+
+#Affichage temperature Aujourd'hui
+temp = data_meteo['daily'][0]['temp']['day']
+temp_affiche= tkinter.Label(root, text = temp )
+temp_affiche.pack(side = 'left' )
+#Affichage temperature Demain
+temp = data_meteo['daily'][1]['temp']['day']
+temp_affiche= tkinter.Label(root, text = temp )
+temp_affiche.pack( )
+#Affichage temperature Apres Demain
+temp = data_meteo['daily'][2]['temp']['day']
+temp_affiche= tkinter.Label(root, text = temp )
+temp_affiche.pack(side = 'right' )
+
+root.mainloop()
+
+
+
+
+
+
+
 
